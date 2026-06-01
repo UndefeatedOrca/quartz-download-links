@@ -1,23 +1,21 @@
 {
-  "name": "@quartz-community/plugin-template",
+  "name": "quartz-download-links",
   "version": "0.1.0",
-  "description": "Template repository for Quartz community plugins.",
+  "description": "Quartz v5 transformer that marks local asset links as direct downloads.",
   "type": "module",
   "license": "MIT",
-  "author": "Quartz Community",
+  "author": "Patrick",
   "homepage": "https://quartz.jzhao.xyz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/quartz-community/plugin-template"
+    "url": "https://github.com/patri/quartz-download-links"
   },
   "keywords": [
     "quartz",
     "quartz-plugin",
-    "plugin-template",
+    "download",
     "remark",
-    "rehype",
-    "mdast",
-    "hast"
+    "mdast"
   ],
   "files": [
     "dist",
@@ -34,10 +32,6 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
     },
-    "./components": {
-      "types": "./dist/components/index.d.ts",
-      "import": "./dist/components/index.js"
-    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -53,13 +47,9 @@
     "check": "npm run typecheck && npm run lint && npm run format && npm run test"
   },
   "peerDependencies": {
-    "preact": "^10.0.0",
     "vfile": "^6.0.3"
   },
   "peerDependenciesMeta": {
-    "preact": {
-      "optional": false
-    },
     "vfile": {
       "optional": true
     }
@@ -94,30 +84,42 @@
     "vitest": "^2.1.9"
   },
   "quartz": {
-    "name": "plugin-template",
-    "displayName": "Plugin Template",
-    "category": "transformer",
+    "name": "direct-download",
+    "displayName": "Direct Download Links",
+    "category": [
+      "transformer"
+    ],
     "version": "1.0.0",
     "quartzVersion": ">=5.0.0",
     "dependencies": [],
     "defaultOrder": 50,
     "defaultEnabled": true,
-    "defaultOptions": {},
-    "optionSchema": {
-      "highlightToken": {
-        "type": "enum",
-        "values": [
-          "==",
-          "**",
-          "~~"
-        ]
-      }
+    "defaultOptions": {
+      "excludedExtensions": [
+        "md",
+        "markdown",
+        "pdf",
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "svg",
+        "webp",
+        "bmp",
+        "ico",
+        "avif"
+      ],
+      "maxExtensionLength": 5
     },
-    "components": {
-      "ExampleComponent": {
-        "displayName": "Example Component",
-        "defaultPosition": "right",
-        "defaultPriority": 50
+    "optionSchema": {
+      "excludedExtensions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "maxExtensionLength": {
+        "type": "number"
       }
     }
   },

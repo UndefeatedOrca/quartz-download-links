@@ -1,15 +1,6 @@
-export { ExampleTransformer } from "./transformer";
-export { ExampleFilter } from "./filter";
-export { ExampleEmitter } from "./emitter";
-export { default as ExampleComponent } from "./components/ExampleComponent";
+export { DirectDownload } from "./transformer";
 
-export type {
-  ExampleTransformerOptions,
-  ExampleFilterOptions,
-  ExampleEmitterOptions,
-} from "./types";
-
-export type { ExampleComponentOptions } from "./components/ExampleComponent";
+export type { DirectDownloadOptions } from "./types";
 
 // Re-export shared types from @quartz-community/types
 export type {

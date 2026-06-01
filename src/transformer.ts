@@ -1,103 +1,109 @@
-import type { PluggableList, Plugin } from "unified";
-import type { Root as MdastRoot } from "mdast";
-import type { Root as HastRoot, Element } from "hast";
-import type { VFile } from "vfile";
-import remarkGfm from "remark-gfm";
-import rehypeSlug from "rehype-slug";
-import { findAndReplace } from "mdast-util-find-and-replace";
+import type { Link, Root } from "mdast";
+import type { Plugin, PluggableList } from "unified";
 import { visit } from "unist-util-visit";
-import type { QuartzTransformerPlugin, BuildCtx } from "@quartz-community/types";
-import type { ExampleTransformerOptions } from "./types";
+import type { QuartzTransformerPlugin } from "@quartz-community/types";
+import type { DirectDownloadOptions } from "./types";
 
-const defaultOptions: ExampleTransformerOptions = {
-  highlightToken: "==",
-  headingClass: "example-plugin-heading",
-  enableGfm: true,
-  addHeadingSlugs: true,
-};
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const remarkHighlightToken = (token: string): Plugin<[], MdastRoot> => {
-  const escapedToken = escapeRegExp(token);
-  const pattern = new RegExp(`${escapedToken}([^\n]+?)${escapedToken}`, "g");
-  return () => (tree: MdastRoot, _file: VFile) => {
-    findAndReplace(tree, [
-      [
-        pattern,
-        (_match: string, value: string) => ({
-          type: "strong",
-          children: [{ type: "text", value }],
-        }),
-      ],
-    ]);
+type LinkWithHProperties = Link & {
+  data?: Link["data"] & {
+    hProperties?: Record<string, unknown>;
   };
 };
 
-const rehypeHeadingClass = (className: string): Plugin<[], HastRoot> => {
-  return () => (tree: HastRoot, _file: VFile) => {
-    visit(tree, "element", (node: Element) => {
-      if (!/^h[1-6]$/.test(node.tagName)) {
+const defaultOptions: DirectDownloadOptions = {
+  excludedExtensions: [
+    "md",
+    "markdown",
+    "pdf",
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "svg",
+    "webp",
+    "bmp",
+    "ico",
+    "avif",
+  ],
+  maxExtensionLength: 5,
+};
+
+const normalizeExtensions = (extensions: string[]) =>
+  new Set(extensions.map((extension) => extension.replace(/^\./, "").toLowerCase()));
+
+const hasProtocol = (url: string) => /^[a-z][a-z\d+.-]*:/i.test(url);
+
+const isLocalDownloadCandidate = (url: string) => {
+  if (
+    url.length === 0 ||
+    url.startsWith("#") ||
+    url.startsWith("?") ||
+    url.startsWith("//") ||
+    url.startsWith("..") ||
+    hasProtocol(url)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const getExtension = (url: string) => {
+  const path = url.split(/[?#]/, 1)[0] ?? "";
+  const filename = path.split("/").pop() ?? "";
+  const dotIndex = filename.lastIndexOf(".");
+
+  if (dotIndex <= 0 || dotIndex === filename.length - 1) {
+    return undefined;
+  }
+
+  return filename.slice(dotIndex + 1).toLowerCase();
+};
+
+const setDownloadAttribute = (node: Link) => {
+  const link = node as LinkWithHProperties;
+  node.data = node.data ?? {};
+  link.data = link.data ?? {};
+  link.data.hProperties = {
+    ...link.data.hProperties,
+    download: "",
+  };
+};
+
+const remarkDirectDownload = (options: DirectDownloadOptions): Plugin<[], Root> => {
+  const excludedExtensions = normalizeExtensions(options.excludedExtensions);
+
+  return () => (tree: Root) => {
+    visit(tree, "link", (node: Link) => {
+      if (!isLocalDownloadCandidate(node.url)) {
         return;
       }
 
-      const existing = node.properties?.className;
-      const classes: string[] = Array.isArray(existing)
-        ? existing.filter((value): value is string => typeof value === "string")
-        : typeof existing === "string"
-          ? [existing]
-          : [];
-      node.properties = {
-        ...node.properties,
-        className: [...classes, className],
-      };
+      const extension = getExtension(node.url);
+      if (
+        extension === undefined ||
+        extension.length > options.maxExtensionLength ||
+        excludedExtensions.has(extension)
+      ) {
+        return;
+      }
+
+      setDownloadAttribute(node);
     });
   };
 };
 
 /**
- * Example transformer showing remark/rehype usage and resource injection.
+ * Adds a download attribute to local Markdown links that point at downloadable assets.
  */
-export const ExampleTransformer: QuartzTransformerPlugin<Partial<ExampleTransformerOptions>> = (
-  userOptions?: Partial<ExampleTransformerOptions>,
+export const DirectDownload: QuartzTransformerPlugin<Partial<DirectDownloadOptions>> = (
+  userOptions?: Partial<DirectDownloadOptions>,
 ) => {
   const options = { ...defaultOptions, ...userOptions };
   return {
-    name: "ExampleTransformer",
-    textTransform(_ctx: BuildCtx, src: string) {
-      return src.endsWith("\n") ? src : `${src}\n`;
-    },
+    name: "DirectDownload",
     markdownPlugins(): PluggableList {
-      const plugins: PluggableList = [remarkHighlightToken(options.highlightToken)];
-      if (options.enableGfm) {
-        plugins.unshift(remarkGfm);
-      }
-      return plugins;
-    },
-    htmlPlugins(): PluggableList {
-      const plugins: PluggableList = [rehypeHeadingClass(options.headingClass)];
-      if (options.addHeadingSlugs) {
-        plugins.unshift(rehypeSlug);
-      }
-      return plugins;
-    },
-    externalResources() {
-      return {
-        css: [
-          {
-            content: `.${options.headingClass} { letter-spacing: 0.02em; }`,
-            inline: true,
-          },
-        ],
-        js: [
-          {
-            contentType: "inline",
-            loadTime: "afterDOMReady",
-            script: "document.documentElement.dataset.exampleTransformer = 'true'",
-          },
-        ],
-        additionalHead: [],
-      };
+      return [remarkDirectDownload(options)];
     },
   };
 };
